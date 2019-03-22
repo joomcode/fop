@@ -35,7 +35,8 @@ import static org.junit.Assert.assertEquals;
  */
 public class TTFSubSetFileTestCase extends TTFFileTestCase {
     private TTFSubSetFile ttfSubset;
-    private byte[] subset;
+    private byte[] subsetFromReader;
+    private byte[] subsetFromFile;
     /**
      * Constructor
      * @throws IOException exception
@@ -50,14 +51,18 @@ public class TTFSubSetFileTestCase extends TTFFileTestCase {
      */
     @Before
     public void setUp() throws IOException {
-        ttfSubset = new TTFSubSetFile();
         Map<Integer, Integer> glyphs = new HashMap<Integer, Integer>();
         for (int i = 0; i < 255; i++) {
             glyphs.put(i, i);
         }
         String header = OFFontLoader.readHeader(dejavuReader);
-        ttfSubset.readFont(dejavuReader, "DejaVu", header, glyphs);
-        subset = ttfSubset.getFontSubset();
+
+        ttfSubset = new TTFSubSetFile();
+        ttfSubset.readFont(new FontFileReader(new ByteArrayInputStream(dejavuReader.getAllBytes())), "DejaVu", header, glyphs);
+        subsetFromReader = ttfSubset.getFontSubset();
+        ttfSubset = new TTFSubSetFile();
+        ttfSubset.readFont(dejavuTTFFile, "DejaVu", header, glyphs);
+        subsetFromFile = ttfSubset.getFontSubset();
     }
     /**
      * Test readFont(FontFileReader, String, Map) - Reads the font and tests the output by injecting
@@ -67,13 +72,15 @@ public class TTFSubSetFileTestCase extends TTFFileTestCase {
      */
     @Test
     public void testReadFont3Args() throws IOException {
-
-        ByteArrayInputStream byteArray = new ByteArrayInputStream(subset);
-        FontFileReader reader = new FontFileReader(byteArray);
-        String header = OFFontLoader.readHeader(reader);
-        dejavuTTFFile.readFont(reader, header);
-        // Test a couple arbitrary values
-        assertEquals(dejavuTTFFile.convertTTFUnit2PDFUnit(-1576), dejavuTTFFile.getFontBBox()[0]);
-        assertEquals(dejavuTTFFile.getFullName(), "DejaVu LGC Serif");
+        byte[][] subsets = {subsetFromReader, subsetFromFile};
+        for (byte[] subset : subsets) {
+            ByteArrayInputStream byteArray = new ByteArrayInputStream(subset);
+            FontFileReader reader = new FontFileReader(byteArray);
+            String header = OFFontLoader.readHeader(reader);
+            dejavuTTFFile.readFont(reader, header);
+            // Test a couple arbitrary values
+            assertEquals(dejavuTTFFile.convertTTFUnit2PDFUnit(-1576), dejavuTTFFile.getFontBBox()[0]);
+            assertEquals(dejavuTTFFile.getFullName(), "DejaVu LGC Serif");
+        }
     }
 }

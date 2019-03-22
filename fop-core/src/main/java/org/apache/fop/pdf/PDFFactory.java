@@ -43,6 +43,7 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.fop.fonts.truetype.*;
 import org.apache.xmlgraphics.java2d.color.NamedColorSpace;
 import org.apache.xmlgraphics.xmp.Metadata;
 
@@ -59,10 +60,6 @@ import org.apache.fop.fonts.SimpleSingleByteEncoding;
 import org.apache.fop.fonts.SingleByteEncoding;
 import org.apache.fop.fonts.SingleByteFont;
 import org.apache.fop.fonts.Typeface;
-import org.apache.fop.fonts.truetype.FontFileReader;
-import org.apache.fop.fonts.truetype.OFFontLoader;
-import org.apache.fop.fonts.truetype.OTFSubSetFile;
-import org.apache.fop.fonts.truetype.TTFSubSetFile;
 import org.apache.fop.fonts.type1.PFBData;
 import org.apache.fop.fonts.type1.PFBParser;
 import org.apache.fop.fonts.type1.Type1SubsetFile;
@@ -1455,7 +1452,11 @@ public class PDFFactory {
             return otfFile.getFontSubset();
         } else {
             TTFSubSetFile otfFile = new TTFSubSetFile();
-            otfFile.readFont(reader, mbfont.getTTCName(), header, mbfont.getUsedGlyphs());
+            if (mbfont.getBackedFile() != null && mbfont.getBackedFile().getOpenFontFile() != null) {
+                otfFile.readFont(mbfont.getBackedFile().getOpenFontFile(), mbfont.getTTCName(), header, mbfont.getUsedGlyphs());
+            } else {
+                otfFile.readFont(reader, mbfont.getTTCName(), header, mbfont.getUsedGlyphs());
+            }
             return otfFile.getFontSubset();
         }
     }

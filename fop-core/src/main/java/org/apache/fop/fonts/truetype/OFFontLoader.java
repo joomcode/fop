@@ -20,11 +20,13 @@
 package org.apache.fop.fonts.truetype;
 
 import java.awt.Rectangle;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.IOUtils;
 
@@ -47,6 +49,7 @@ import org.apache.fop.util.HexEncoder;
  * Loads a TrueType font into memory directly from the original font file.
  */
 public class OFFontLoader extends FontLoader {
+    private static final ConcurrentHashMap<URI, OpenFont> cache = new ConcurrentHashMap<URI, OpenFont>();
 
     private MultiByteFont multiFont;
     private SingleByteFont singleFont;
@@ -55,6 +58,7 @@ public class OFFontLoader extends FontLoader {
     private EmbeddingMode embeddingMode;
     private boolean simulateStyle;
     private boolean embedAsType1;
+    private OpenFont parsedFile;
 
     /**
      * Default constructor
@@ -96,33 +100,37 @@ public class OFFontLoader extends FontLoader {
         }
     }
 
-    /** {@inheritDoc} */
-    protected void read() throws IOException {
-        read(this.subFontName);
+    public OpenFont getParsedFile() throws IOException {
+        if (parsedFile != null) {
+            return parsedFile;
+        }
+        synchronized (this) {
+            InputStream in = resourceResolver.getResource(this.fontFileURI);
+            try {
+                FontFileReader reader = new FontFileReader(in);
+                String header = readHeader(reader);
+                boolean isCFF = header.equals("OTTO");
+                OpenFont resFile = (isCFF) ? new OTFFile(useKerning, useAdvanced) : new TTFFile(useKerning, useAdvanced);
+                boolean supported = resFile.readFont(reader, header, subFontName);
+                if (!supported) {
+                    throw new IOException("The font does not have a Unicode cmap table: " + fontFileURI);
+                }
+                parsedFile = resFile;
+            } finally {
+                IOUtils.closeQuietly(in);
+            }
+        }
+        return parsedFile;
     }
+
 
     /**
      * Reads a TrueType font.
-     * @param ttcFontName the TrueType sub-font name of TrueType Collection (may be null for
-     *    normal TrueType fonts)
      * @throws IOException if an I/O error occurs
      */
-    private void read(String ttcFontName) throws IOException {
-        InputStream in = resourceResolver.getResource(this.fontFileURI);
-        try {
-            FontFileReader reader = new FontFileReader(in);
-            String header = readHeader(reader);
-            boolean isCFF = header.equals("OTTO");
-            OpenFont otf = (isCFF) ? new OTFFile(useKerning, useAdvanced) : new TTFFile(useKerning, useAdvanced);
-            boolean supported = otf.readFont(reader, header, ttcFontName);
-            if (!supported) {
-                throw new IOException("The font does not have a Unicode cmap table: " + fontFileURI);
-            }
-            buildFont(otf, ttcFontName, embedAsType1);
-            loaded = true;
-        } finally {
-            IOUtils.closeQuietly(in);
-        }
+    protected void read() throws IOException {
+        buildFont(getParsedFile(), subFontName, embedAsType1);
+        loaded = true;
     }
 
     public static String readHeader(FontFileReader fontFile) throws IOException {
@@ -156,7 +164,7 @@ public class OFFontLoader extends FontLoader {
             font = singleFont;
         }
         font.setSimulateStyle(simulateStyle);
-
+        returnFont.setBackedFile(new CustomFont.BackedFileHolder().setOpenFontFile(otf));
         returnFont.setFontURI(fontFileURI);
         if (!otf.getEmbedFontName().equals("")) {
             returnFont.setFontName(otf.getEmbedFontName());

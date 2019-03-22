@@ -23,10 +23,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
 
 import org.apache.fop.apps.io.InternalResourceResolver;
 import org.apache.fop.apps.io.ResourceResolverFactory;
@@ -59,4 +63,24 @@ public class TTFFontLoaderTestCase {
                 EncodingMode.AUTO, useKerning, useComplexScriptFeatures, resourceResolver, false, false);
         assertFalse(fontLoader.getFont().hasKerningInfo());
     }
+
+    @Test
+    public void testBackedFile() throws IOException {
+        boolean useComplexScriptFeatures = false;
+        File file = new File("test/resources/fonts/ttf/DejaVuLGCSerif.ttf");
+        URI absoluteFilePath = file.toURI();
+        InternalResourceResolver resourceResolver = ResourceResolverFactory.createDefaultInternalResourceResolver(
+                new File(".").toURI());
+        String fontName = "Deja Vu";
+        boolean embedded = false;
+        boolean useKerning = true;
+
+        OFFontLoader fontLoader = new OFFontLoader(absoluteFilePath, fontName, embedded,
+                EmbeddingMode.AUTO, EncodingMode.AUTO, useKerning, useComplexScriptFeatures,
+                resourceResolver, false, false);
+        assertNotNull(fontLoader.getFont().getBackedFile());
+        assertNotNull(fontLoader.getFont().getBackedFile().getOpenFontFile());
+    }
+
+
 }

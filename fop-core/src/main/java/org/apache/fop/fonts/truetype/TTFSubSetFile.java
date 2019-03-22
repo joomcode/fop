@@ -19,6 +19,7 @@
 
 package org.apache.fop.fonts.truetype;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -309,13 +310,14 @@ public class TTFSubSetFile extends TTFFile {
             writeBytes(in.getBytes((int) entry.getOffset(), (int) entry.getLength()));
 
             checkSumAdjustmentOffset = currentPos + 8;
-            output[currentPos + 8] = 0;     // Set checkSumAdjustment to 0
-            output[currentPos + 9] = 0;
-            output[currentPos + 10] = 0;
-            output[currentPos + 11] = 0;
-            output[currentPos + 50] = 0;    // long locaformat
+
+            writeByteAtPos((byte)0, currentPos + 8);     // Set checkSumAdjustment to 0
+            writeByteAtPos((byte)0, currentPos + 9);
+            writeByteAtPos((byte)0, currentPos + 10);
+            writeByteAtPos((byte)0, currentPos + 11);
+            writeByteAtPos((byte)0, currentPos + 50); // long locaformat
             if (cid) {
-                output[currentPos + 51] = 1;    // long locaformat
+                writeByteAtPos((byte)1, currentPos + 51);    // long locaformat
             }
             updateCheckSum(currentPos, (int)entry.getLength(), head);
             currentPos += (int)entry.getLength();
@@ -449,6 +451,29 @@ public class TTFSubSetFile extends TTFFile {
         }
     }
 
+    public void readFont(OpenFont originalFile, String name, String header,
+                         Map<Integer, Integer> glyphs) throws IOException {
+        fontFile = new FontFileReader(new ByteArrayInputStream(originalFile.fontFile.getAllBytes()));
+        //Check if TrueType collection, and that the name exists in the collection
+        if (!checkTTC(header, name)) {
+            throw new IOException("Failed to read font");
+        }
+
+        //Copy the Map as we're going to modify it
+        Map<Integer, Integer> subsetGlyphs = new HashMap<Integer, Integer>(glyphs);
+
+        output = new byte[getApproximateOutputSize(fontFile.getFileSize(), glyphs.size(), originalFile.numberOfGlyphs)];
+
+        dirTabs = originalFile.dirTabs;
+        mtxTab = originalFile.mtxTab;
+        nhmtx = originalFile.nhmtx;
+        numberOfGlyphs = originalFile.numberOfGlyphs;
+        lastLoca= originalFile.lastLoca;
+
+        fillOutput(subsetGlyphs);
+    }
+
+
     /**
      * Reads a font and creates a subset of the font.
      *
@@ -469,8 +494,6 @@ public class TTFSubSetFile extends TTFFile {
         //Copy the Map as we're going to modify it
         Map<Integer, Integer> subsetGlyphs = new HashMap<Integer, Integer>(glyphs);
 
-        output = new byte[in.getFileSize()];
-
         readDirTabs();
         readFontHeader();
         getNumGlyphs();
@@ -478,34 +501,45 @@ public class TTFSubSetFile extends TTFFile {
         readHorizontalMetrics();
         readIndexToLocation();
 
-        scanGlyphs(in, subsetGlyphs);
+        output = new byte[getApproximateOutputSize(fontFile.getFileSize(), glyphs.size(), this.numberOfGlyphs)];
+
+        fillOutput(subsetGlyphs);
+    }
+
+    private int getApproximateOutputSize(int originalFileSize, int subsetGlyphCount, int originalGlyphCount) {
+        double share = ((double)subsetGlyphCount / originalGlyphCount);
+        return  (int)(share * originalFileSize * 2) + 1;
+    }
+
+    private void fillOutput(Map<Integer, Integer> subsetGlyphs) throws IOException {
+        scanGlyphs(fontFile, subsetGlyphs);
 
         createDirectory();     // Create the TrueType header and directory
 
         boolean optionalTableFound;
-        optionalTableFound = createCvt(in);    // copy the cvt table
+        optionalTableFound = createCvt(fontFile);    // copy the cvt table
         if (!optionalTableFound) {
             // cvt is optional (used in TrueType fonts only)
             log.debug("TrueType: ctv table not present. Skipped.");
         }
 
-        optionalTableFound = createFpgm(in);    // copy fpgm table
+        optionalTableFound = createFpgm(fontFile);    // copy fpgm table
         if (!optionalTableFound) {
             // fpgm is optional (used in TrueType fonts only)
             log.debug("TrueType: fpgm table not present. Skipped.");
         }
         createLoca(subsetGlyphs.size());    // create empty loca table
-        createGlyf(in, subsetGlyphs); //create glyf table and update loca table
+        createGlyf(fontFile, subsetGlyphs); //create glyf table and update loca table
 
-        createOS2(in);                          // copy the OS/2 table
-        createHead(in);
-        createHhea(in, subsetGlyphs.size());    // Create the hhea table
-        createHmtx(in, subsetGlyphs);           // Create hmtx table
-        createMaxp(in, subsetGlyphs.size());    // copy the maxp table
-        createName(in);                         // copy the name table
-        createPost(in);                         // copy the post table
+        createOS2(fontFile);                          // copy the OS/2 table
+        createHead(fontFile);
+        createHhea(fontFile, subsetGlyphs.size());    // Create the hhea table
+        createHmtx(fontFile, subsetGlyphs);           // Create hmtx table
+        createMaxp(fontFile, subsetGlyphs.size());    // copy the maxp table
+        createName(fontFile);                         // copy the name table
+        createPost(fontFile);                         // copy the post table
 
-        optionalTableFound = createPrep(in);    // copy prep table
+        optionalTableFound = createPrep(fontFile);    // copy prep table
         if (!optionalTableFound) {
             // prep is optional (used in TrueType fonts only)
             log.debug("TrueType: prep table not present. Skipped.");
@@ -591,20 +625,35 @@ public class TTFSubSetFile extends TTFFile {
         return length;
     }
 
+    private void ensureOutputSize(int pos) {
+        while (pos >= output.length) {
+            byte[] newoutput = new byte[output.length * 2];
+            System.arraycopy(output, 0, newoutput, 0, output.length);
+            output = newoutput;
+        }
+    }
+
+
+    /**
+     * Appends a byte to the output array,
+     * updates currentPost but not realSize
+     */
+    private void writeByteAtPos(byte b, int pos) {
+        ensureOutputSize(pos);
+        output[pos] = b;
+    }
+
     /**
      * Appends a byte to the output array,
      * updates currentPost but not realSize
      */
     private void writeByte(byte b) {
+        ensureOutputSize(currentPos);
         output[currentPos++] = b;
     }
 
     protected void writeBytes(byte[] b) {
-        if (b.length + currentPos > output.length) {
-            byte[] newoutput = new byte[output.length * 2];
-            System.arraycopy(output, 0, newoutput, 0, output.length);
-            output = newoutput;
-        }
+        ensureOutputSize(b.length + currentPos);
         System.arraycopy(b, 0, output, currentPos, b.length);
     }
 
@@ -626,8 +675,8 @@ public class TTFSubSetFile extends TTFFile {
     protected void writeUShort(int pos, int s) {
         byte b1 = (byte)((s >> 8) & 0xff);
         byte b2 = (byte)(s & 0xff);
-        output[pos] = b1;
-        output[pos + 1] = b2;
+        writeByteAtPos(b1, pos);
+        writeByteAtPos(b2, pos+1);
     }
 
 
@@ -640,10 +689,10 @@ public class TTFSubSetFile extends TTFFile {
         byte b2 = (byte)((s >> 16) & 0xff);
         byte b3 = (byte)((s >> 8) & 0xff);
         byte b4 = (byte)(s & 0xff);
-        output[pos] = b1;
-        output[pos + 1] = b2;
-        output[pos + 2] = b3;
-        output[pos + 3] = b4;
+        writeByteAtPos(b1, pos);
+        writeByteAtPos(b2, pos+1);
+        writeByteAtPos(b3, pos+2);
+        writeByteAtPos(b4, pos+3);
     }
 
     /**
@@ -654,7 +703,7 @@ public class TTFSubSetFile extends TTFFile {
         int padSize = getPadSize(currentPos);
         if (padSize < 4) {
             for (int i = 0; i < padSize; i++) {
-                output[currentPos++] = 0;
+                writeByteAtPos((byte)0, currentPos++);
                 realSize++;
             }
         }

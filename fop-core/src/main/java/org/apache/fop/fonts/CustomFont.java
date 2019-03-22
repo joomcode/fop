@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.fop.apps.io.InternalResourceResolver;
+import org.apache.fop.fonts.truetype.OpenFont;
 
 
 /**
@@ -39,6 +40,18 @@ import org.apache.fop.apps.io.InternalResourceResolver;
  */
 public abstract class CustomFont extends Typeface
             implements FontDescriptor, MutableFont {
+    public static class BackedFileHolder {
+        private OpenFont openFontFile;
+
+        public OpenFont getOpenFontFile()  {
+            return openFontFile;
+        }
+
+        public BackedFileHolder setOpenFontFile(OpenFont openFontFile) {
+            this.openFontFile = openFontFile;
+            return this;
+        }
+    }
 
     /** Fallback thickness for underline and strikeout when not provided by the font. */
     private static final int DEFAULT_LINE_THICKNESS = 50;
@@ -84,6 +97,7 @@ public abstract class CustomFont extends Typeface
     private boolean simulateStyle;
     protected List<SimpleSingleByteEncoding> additionalEncodings;
     protected Map<Character, SingleByteFont.UnencodedCharacter> unencodedCharacters;
+    private BackedFileHolder fontFileHolder;
 
     /**
      * @param resourceResolver the URI resource resolver for controlling file access
@@ -644,6 +658,13 @@ public abstract class CustomFont extends Typeface
         } else {
             //Cannot deal with unicode sequences, so ignore this character
         }
+    }
+    public void setBackedFile(BackedFileHolder fileHolder) {
+        this.fontFileHolder = fileHolder;
+    }
+
+    public BackedFileHolder getBackedFile() {
+        return this.fontFileHolder;
     }
 
     /**

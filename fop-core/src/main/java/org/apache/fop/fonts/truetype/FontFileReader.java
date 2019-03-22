@@ -19,20 +19,27 @@
 
 package org.apache.fop.fonts.truetype;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.fop.render.ps.extensions.PSExtensionHandler;
+import org.apache.xmlgraphics.io.Resource;
 
 /**
  * Reads a TrueType font file into a byte array and
  * provides file like functions for array access.
  */
 public class FontFileReader {
+    protected static final Log log = LogFactory.getLog(FontFileReader.class);
 
-    private final int fsize; // file size
+    private int fsize; // file size
     private int current;    // current position in file
-    private final byte[] file;
+    private byte[] file;
 
     /**
      * Constructor
@@ -41,6 +48,36 @@ public class FontFileReader {
      * @throws IOException In case of an I/O problem
      */
     public FontFileReader(InputStream in) throws IOException {
+        ByteArrayInputStream byteStream = in instanceof ByteArrayInputStream ? ((ByteArrayInputStream) in) : null;
+        Resource resource = in instanceof Resource ? ((Resource)in) : null;
+        if (resource != null) {
+            Field f = null;
+            try {
+                f = resource.getClass().getSuperclass().getDeclaredField("in");
+                f.setAccessible(true);
+                Object resourceInput = f.get(resource);
+                byteStream = resourceInput instanceof ByteArrayInputStream ? ((ByteArrayInputStream) resourceInput) : null;
+            } catch (NoSuchFieldException e) {
+                log.error("Can't find field 'in' in Resource class", e);
+            } catch (IllegalAccessException e) {
+                log.error("Disabled access to field 'in' in Resource class object", e);
+            }
+        }
+        if (byteStream != null) {
+            try {
+                Field f = byteStream.getClass().getDeclaredField("buf");
+                f.setAccessible(true);
+                this.file = (byte[])f.get(byteStream);
+                this.fsize = this.file.length;
+                this.current = 0;
+                return;
+            } catch (NoSuchFieldException e) {
+                log.error("Can't find field 'buf' in ByteArrayInputStream class", e);
+            } catch (IllegalAccessException e) {
+                log.error("Disabled access to field 'buf' in ByteArrayInputStream class object", e);
+            }
+
+        }
         this.file = IOUtils.toByteArray(in);
         this.fsize = this.file.length;
         this.current = 0;
