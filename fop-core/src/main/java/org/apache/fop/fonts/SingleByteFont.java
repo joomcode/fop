@@ -485,6 +485,8 @@ public class SingleByteFont extends CustomFont implements Cloneable {
         try {
             SingleByteFont f = (SingleByteFont)this.clone();
             f.init(f.getEmbeddingMode());
+            f.unencodedCharacters = null;
+            f.additionalEncodings = null;
             return f;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);

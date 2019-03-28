@@ -863,6 +863,8 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
         try {
             MultiByteFont f = (MultiByteFont)this.clone();
             f.init();
+            f.additionalEncodings = null;
+            f.unencodedCharacters = null;
             return f;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
