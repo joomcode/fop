@@ -176,7 +176,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
     }
 
     public void mapUsedGlyphName(int gid, String value) {
-        usedGlyphNames.put(gid, value);
+        getUsedGlyphNames().put(gid, value);
     }
 
     public LinkedHashMap<Integer, String> getUsedGlyphNames() {
@@ -192,7 +192,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
     /** {@inheritDoc} */
     public int getWidth(int i, int size) {
         if (isEmbeddable()) {
-            int glyphIndex = cidSet.getOriginalGlyphIndex(i);
+            int glyphIndex = getCIDSet().getOriginalGlyphIndex(i);
             return size * width[glyphIndex];
         } else {
             return size * width[i];
@@ -207,7 +207,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
     }
 
     public Rectangle getBoundingBox(int glyphIndex, int size) {
-        int index = isEmbeddable() ? cidSet.getOriginalGlyphIndex(glyphIndex) : glyphIndex;
+        int index = isEmbeddable() ? getCIDSet().getOriginalGlyphIndex(glyphIndex) : glyphIndex;
         Rectangle bbox = boundingBoxes[index];
         return new Rectangle(bbox.x * size, bbox.y * size, bbox.width * size, bbox.height * size);
     }
@@ -370,7 +370,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
             }
         }
         if (isEmbeddable()) {
-            glyphIndex = cidSet.mapChar(glyphIndex, c);
+            glyphIndex = getCIDSet().mapChar(glyphIndex, c);
         }
         if (isCID() && glyphIndex > 256) {
             mapUnencodedChar(c);
@@ -395,7 +395,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
             }
         }
         if (isEmbeddable()) {
-            glyphIndex = cidSet.mapCodePoint(glyphIndex, cp);
+            glyphIndex = getCIDSet().mapCodePoint(glyphIndex, cp);
         }
         return (char) glyphIndex;
     }
@@ -457,7 +457,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
      * @return Map Map of used Glyphs
      */
     public Map<Integer, Integer> getUsedGlyphs() {
-        return cidSet.getGlyphs();
+        return getCIDSet().getGlyphs();
     }
 
     /**
@@ -466,7 +466,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
      * @return The character
      */
     public char getUnicodeFromGID(int glyphIndex) {
-        return cidSet.getUnicodeFromGID(glyphIndex);
+        return getCIDSet().getUnicodeFromGID(glyphIndex);
     }
 
     /**
@@ -475,7 +475,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
      * @return The glyph index in the font
      */
     public int getGIDFromChar(char ch) {
-        return cidSet.getGIDFromChar(ch);
+        return getCIDSet().getGIDFromChar(ch);
     }
 
     /**
