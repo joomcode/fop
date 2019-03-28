@@ -121,19 +121,20 @@ public class GlyfTable {
      *
      * @throws IOException an I/O error
      */
-    protected void populateGlyphsWithComposites() throws IOException {
+    protected java.util.SortedMap<Long, Integer> populateGlyphsWithComposites() throws IOException {
         for (int indexInOriginal : subset.keySet()) {
             scanGlyphsRecursively(indexInOriginal);
         }
 
         addAllComposedGlyphsToSubset();
-
+        java.util.SortedMap<Long, Integer> remap = new java.util.TreeMap<Long, Integer>();
         for (int compositeGlyph : compositeGlyphs) {
             long offset = tableOffset + mtxTab[compositeGlyph].getOffset() + 10;
             if (!remappedComposites.contains(offset)) {
-                remapComposite(offset);
+                remapComposite(offset, remap);
             }
         }
+        return remap;
     }
 
     /**
@@ -180,7 +181,7 @@ public class GlyfTable {
      * @param glyphOffset the offset of the composite glyph
      * @throws IOException an I/O error
      */
-    private void remapComposite(long glyphOffset) throws IOException {
+    private void remapComposite(long glyphOffset, Map<Long,Integer> remap) throws IOException {
         long currentGlyphOffset = glyphOffset;
 
         remappedComposites.add(currentGlyphOffset);
@@ -191,12 +192,7 @@ public class GlyfTable {
             int glyphIndex = in.readTTFUShort(currentGlyphOffset + 2);
             Integer indexInSubset = subset.get(glyphIndex);
             assert indexInSubset != null;
-            /*
-             * TODO: this should not be done here!! We're writing to the stream we're reading from,
-             * this is asking for trouble! What should happen is when the glyph data is copied from
-             * subset, the remapping should be done there. So the original stream is left untouched.
-             */
-            in.writeTTFUShort(currentGlyphOffset + 2, indexInSubset);
+            remap.put(currentGlyphOffset+2, indexInSubset);
 
             currentGlyphOffset += 4 + GlyfFlags.getOffsetToNextComposedGlyf(flags);
         } while (GlyfFlags.hasMoreComposites(flags));

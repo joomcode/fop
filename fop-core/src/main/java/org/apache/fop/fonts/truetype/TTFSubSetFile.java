@@ -331,8 +331,8 @@ public class TTFSubSetFile extends TTFFile {
     /**
      * Create the glyf table and fill in loca table
      */
-    private void createGlyf(FontFileReader in,
-            Map<Integer, Integer> glyphs) throws IOException {
+    private void createGlyf(org.apache.fop.fonts.truetype.FontFileReader in,
+                            java.util.Map<Integer, Integer> glyphs, java.util.SortedMap<Long, Integer> remap) throws IOException {
         OFTableName glyf = OFTableName.GLYF;
         OFDirTabEntry entry = dirTabs.get(glyf);
         int size = 0;
@@ -363,6 +363,15 @@ public class TTFSubSetFile extends TTFFile {
                 byte[] glyphData = in.getBytes(
                         (int)entry.getOffset() + glyphOffset,
                         glyphLength);
+                for (Map.Entry<Long, Integer> e:remap.subMap(
+                        entry.getOffset()+ glyphOffset,
+                        entry.getOffset() + glyphOffset + glyphLength).entrySet()) {
+                    int index = (int)(e.getKey()-entry.getOffset()-glyphOffset);
+                    final byte b1 = (byte)((e.getValue() >> 8) & 0xff);
+                    final byte b2 = (byte)(e.getValue() & 0xff);
+                    glyphData[index] = b1;
+                    glyphData[index + 1] = b2;
+                }
                 int endOffset1 = endOffset;
                 // Copy glyph
                 writeBytes(glyphData);
@@ -512,7 +521,7 @@ public class TTFSubSetFile extends TTFFile {
     }
 
     private void fillOutput(Map<Integer, Integer> subsetGlyphs) throws IOException {
-        scanGlyphs(fontFile, subsetGlyphs);
+        java.util.SortedMap<Long, Integer> remap  = scanGlyphs(fontFile, subsetGlyphs);
 
         createDirectory();     // Create the TrueType header and directory
 
@@ -529,7 +538,7 @@ public class TTFSubSetFile extends TTFFile {
             log.debug("TrueType: fpgm table not present. Skipped.");
         }
         createLoca(subsetGlyphs.size());    // create empty loca table
-        createGlyf(fontFile, subsetGlyphs); //create glyf table and update loca table
+        createGlyf(fontFile, subsetGlyphs, remap); //create glyf table and update loca table
 
         createOS2(fontFile);                          // copy the OS/2 table
         createHead(fontFile);
@@ -595,7 +604,7 @@ public class TTFSubSetFile extends TTFFile {
         ttfOut.endFontStream();
     }
 
-    protected void scanGlyphs(FontFileReader in, Map<Integer, Integer> subsetGlyphs)
+    protected java.util.SortedMap<Long, Integer> scanGlyphs(org.apache.fop.fonts.truetype.FontFileReader in, java.util.Map<Integer, Integer> subsetGlyphs)
             throws IOException {
         OFDirTabEntry glyfTableInfo = dirTabs.get(OFTableName.GLYF);
         if (glyfTableInfo == null) {
@@ -603,7 +612,7 @@ public class TTFSubSetFile extends TTFFile {
         }
 
         GlyfTable glyfTable = new GlyfTable(in, mtxTab, glyfTableInfo, subsetGlyphs);
-        glyfTable.populateGlyphsWithComposites();
+        return glyfTable.populateGlyphsWithComposites();
     }
 
     /**
