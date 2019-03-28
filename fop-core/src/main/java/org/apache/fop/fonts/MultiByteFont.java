@@ -47,7 +47,7 @@ import org.apache.fop.util.CharUtilities;
 /**
  * Generic MultiByte (CID) font
  */
-public class MultiByteFont extends CIDFont implements Substitutable, Positionable {
+public class MultiByteFont extends CIDFont implements Substitutable, Positionable, Cloneable {
 
     /** logging instance */
     private static final Log log
@@ -59,7 +59,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
     private int defaultWidth;
     private CIDFontType cidType = CIDFontType.CIDTYPE2;
 
-    protected final CIDSet cidSet;
+    protected CIDSet cidSet;
 
     /* advanced typographic support */
     private GlyphDefinitionTable gdef;
@@ -85,7 +85,7 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
     private int[] mostLikelyGlyphs = new int[NUM_MOST_LIKELY_GLYPHS];
 
     //A map to store each used glyph from the CID set against the glyph name.
-    private LinkedHashMap<Integer, String> usedGlyphNames = new LinkedHashMap<Integer, String>();
+    private LinkedHashMap<Integer, String> usedGlyphNames;
 
     /**
      * Default constructor
@@ -94,7 +94,12 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
         super(resourceResolver);
         setFontType(FontType.TYPE0);
         setEmbeddingMode(embeddingMode);
-        if (embeddingMode != EmbeddingMode.FULL) {
+        init();
+    }
+
+    private void init() {
+        usedGlyphNames = new LinkedHashMap<Integer, String>();
+        if (getEmbeddingMode() != EmbeddingMode.FULL) {
             cidSet = new CIDSubset(this);
         } else {
             cidSet = new CIDFull(this);
@@ -852,6 +857,21 @@ public class MultiByteFont extends CIDFont implements Substitutable, Positionabl
 
     public InputStream getCmapStream() {
         return null;
+    }
+
+    public MultiByteFont freshCopy() {
+        try {
+            MultiByteFont f = (MultiByteFont)this.clone();
+            f.init();
+            return f;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        return super.clone();
     }
 }
 

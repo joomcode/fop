@@ -39,7 +39,7 @@ import org.apache.fop.util.CharUtilities;
 /**
  * Generic SingleByte font
  */
-public class SingleByteFont extends CustomFont {
+public class SingleByteFont extends CustomFont implements Cloneable {
 
     /** logger */
     private  static Log log = LogFactory.getLog(SingleByteFont.class);
@@ -68,6 +68,10 @@ public class SingleByteFont extends CustomFont {
 
     public SingleByteFont(InternalResourceResolver resourceResolver, EmbeddingMode embeddingMode) {
         this(resourceResolver);
+        init(embeddingMode);
+    }
+
+    private void init(EmbeddingMode embeddingMode) {
         setEmbeddingMode(embeddingMode);
         if (embeddingMode != EmbeddingMode.FULL) {
             usedGlyphNames = new LinkedHashMap<Integer, String>();
@@ -475,6 +479,22 @@ public class SingleByteFont extends CustomFont {
             char theChar = usedCharsIndex.get(selector);
             return unencodedCharacters.get(theChar).getCharacter().getName();
         }
+    }
+
+    public SingleByteFont freshCopy() {
+        try {
+            SingleByteFont f = (SingleByteFont)this.clone();
+            f.init(f.getEmbeddingMode());
+            return f;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        return super.clone();
     }
 }
 
